@@ -1,7 +1,7 @@
 body, html{
     height: 100%;
     width: 100%;
-    
+    font-family: CherryBombOne;
 }
 
 body{
@@ -63,4 +63,85 @@ body{
     border-radius: 5px;
     border: none;
     background: white;
+}
+
+/* Vertical bar on the right */
+#side-nav {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    z-index: 100;
+}
+
+.nav-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(40, 44, 52, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+/* The Pop-up Menu */
+#sound-menu-panel, #model-menu-panel {
+    position: fixed;
+    right: 90px; /* Space for the side-nav */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 350px;
+    background: rgba(30, 30, 40, 0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 20px;
+    color: white;
+    z-index: 99;
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+#sound-menu-panel.hidden, #model-menu-panel.hidden{
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) translateX(20px);
+}
+
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.sound-item .model-item{
+    text-align: center;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.circle-icon {
+    width: 60px;
+    height: 60px;
+    border: 3px solid #5a5a7a;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 5px;
+    font-size: 14px;
+}
+
+/* Glowing effect for active items like in your screenshot */
+.sound-item.active .circle-icon, .model-item.active .circle-icon {
+    border-color: #00d4ff;
+    box-shadow: 0 0 10px #00d4ff;
+}
+
+@font-face {
+    font-family: CherryBombOne;
+    src: url(CherryBombOne-Regular.ttf);
 }

@@ -104,37 +104,113 @@ function handleResize()
 
 window.addEventListener("resize", handleResize);
 
-const modelSelect = document.getElementById('model-select');
+// const modelSelect = document.getElementById('model-select');
 
-modelSelect.addEventListener('change', (e) => {
-    const path = e.target.value;
+// modelSelect.addEventListener('change', (e) => {
+//     const path = e.target.value;
     
-    // 1. Remove current model if it exists
-    if (model) {
-        scene.remove(model);
-    }
+//     // 1. Remove current model if it exists
+//     if (model) {
+//         scene.remove(model);
+//     }
 
-    // 2. Load new model
-    loader.load(path, (glb) => {
-        model = glb.scene;
-        model.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
+//     // 2. Load new model
+//     loader.load(path, (glb) => {
+//         model = glb.scene;
+//         model.traverse((child) => {
+//             if (child.isMesh) {
+//                 child.castShadow = true;
+//                 child.receiveShadow = true;
+//             }
+//         });
+//         scene.add(model);
+//     });
+// });
+
+// const soundSelect = document.getElementById('sound-select');
+
+// soundSelect.addEventListener('change', (e) => {
+//     const path = e.target.value;
+    
+//     // Load new buffer into the existing sound object
+//     audioLoader.load(path, (buffer) => {
+//         sound.setBuffer(buffer);
+//     });
+// });
+
+const soundTrigger = document.getElementById('sound-trigger');
+const modelTrigger = document.getElementById('model-trigger');
+const soundMenuPanel = document.getElementById('sound-menu-panel');
+const modelMenuPanel = document.getElementById('model-menu-panel');
+
+// soundTrigger
+// Toggle the menu
+soundTrigger.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevents clicking through to the 3D model
+    soundMenuPanel.classList.toggle('hidden');
+    modelMenuPanel.classList.add('hidden');
+});
+
+// Close menu if clicking outside on the canvas
+window.addEventListener('click', (e) => {
+    if (!soundMenuPanel.contains(e.target) && e.target !== soundTrigger) {
+        soundMenuPanel.classList.add('hidden');
+    }
+});
+
+// Sound Selection Logic
+document.querySelectorAll('.sound-item').forEach(item => {
+    item.addEventListener('click', () => {
+        const soundPath = item.getAttribute('data-sound');
+        
+        // Load the new buffer
+        audioLoader.load(soundPath, (buffer) => {
+            sound.setBuffer(buffer);
+            
+            // Visual feedback: remove active from others, add to this
+            document.querySelectorAll('.sound-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
         });
-        scene.add(model);
     });
 });
 
-const soundSelect = document.getElementById('sound-select');
+// Model Trigger
+// Toggle the menu
+modelTrigger.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevents clicking through to the 3D model
+    modelMenuPanel.classList.toggle('hidden');
+    soundMenuPanel.classList.add('hidden');
+});
 
-soundSelect.addEventListener('change', (e) => {
-    const path = e.target.value;
-    
-    // Load new buffer into the existing sound object
-    audioLoader.load(path, (buffer) => {
-        sound.setBuffer(buffer);
+// Close menu if clicking outside on the canvas
+window.addEventListener('click', (e) => {
+    if (!modelMenuPanel.contains(e.target) && e.target !== modelTrigger) {
+        modelMenuPanel.classList.add('hidden');
+    }
+});
+
+document.querySelectorAll('.model-item').forEach(item => {
+    item.addEventListener('click', () => {
+        const path = item.getAttribute('data-model');
+        
+        // 1. Remove current model if it exists
+        if (model) {
+            scene.remove(model);
+        }
+
+        // 2. Load new model (MOVE THIS OUTSIDE THE IF BLOCK)
+        loader.load(path, (glb) => {
+            model = glb.scene;
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            scene.add(model);
+            document.querySelectorAll('.model-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+        }, undefined, (error) => console.error(error));
     });
 });
 
