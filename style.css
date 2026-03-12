@@ -1,3 +1,9 @@
+body, html{
+    height: 100%;
+    width: 100%;
+    
+}
+
 body{
     padding: 0;
     margin: 0;
@@ -19,10 +25,42 @@ body{
     width: 100%;
     top: 0;
     left: 0;
-    overflow: hidden;
+    background: linear-gradient(180deg, #2193b0, #aef0ff);
 }
 
 #experience-canvas{
     width: 100%;
     height: 100%;
+    background: transparent;
+    display: block;
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px); /* Modern frosted glass look */
+    z-index: 10; /* Higher than canvas */
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    font-family: sans-serif;
+    border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+#ui-layer label {
+    font-weight: bold;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+#ui-layer select {
+    padding: 8px;
+    border-radius: 5px;
+    border: none;
+    background: white;
 }

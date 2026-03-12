@@ -3,6 +3,7 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/exampl
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
 const scene = new THREE.Scene();
+scene.background = null;
 
 const canvas = document.getElementById("experience-canvas");
 const sizes = {
@@ -10,7 +11,8 @@ const sizes = {
     height: window.innerHeight,
 }
 
-const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true});
+const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true, alpha: true});
+renderer.setClearColor(0x000000, 0);
 renderer.setSize( sizes.width, sizes.height );
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
@@ -19,17 +21,22 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 const loader = new GLTFLoader();
 
+let model = null;
+
 loader.load( 
-    "./fishes.glb", 
+    "./capoo.glb", 
     function ( glb ) {
-    glb.scene.traverse((child)=>{
+
+        model = glb.scene;
+
+    model.traverse((child)=>{
         if (child.isMesh)
         {
             child.castShadow = true;
             child.receiveShadow = true;
         }
     });
-  scene.add( glb.scene );
+  scene.add( model );
 
 }, undefined, function ( error ) {
 
@@ -43,13 +50,14 @@ sun.shadow.normalBias = 0.1;
 sun.position.set(0, 20, 0);
 scene.add( sun );
 
-const shadowHelper = new THREE.CameraHelper( sun.shadow.camera );
-scene.add( shadowHelper );
-const helper = new THREE.DirectionalLightHelper( sun, 5 );
-scene.add( helper );
+// const shadowHelper = new THREE.CameraHelper( sun.shadow.camera );
+// scene.add( shadowHelper );
+// const helper = new THREE.DirectionalLightHelper( sun, 5 );
+// scene.add( helper );
 
 const light = new THREE.AmbientLight( 0x404040, 3); // soft white light
 scene.add( light );
+
 
 
 const camera = new THREE.PerspectiveCamera
@@ -60,7 +68,19 @@ const camera = new THREE.PerspectiveCamera
     1000 
 );
 
+const listener = new THREE.AudioListener();
+camera.add( listener );
+const sound = new THREE.Audio( listener );
+
+const audioLoader = new THREE.AudioLoader();
+audioLoader.load( 'sounds/pop1.mp3', function( buffer ) {
+	sound.setBuffer( buffer );
+	sound.setVolume( 0.5 );
+	
+});
+
 const controls = new OrbitControls( camera, canvas );
+
 controls.update();
 
 // const geometry = new THREE.BoxGeometry( 1, 1, 1 );
@@ -84,13 +104,113 @@ function handleResize()
 
 window.addEventListener("resize", handleResize);
 
+const modelSelect = document.getElementById('model-select');
+
+modelSelect.addEventListener('change', (e) => {
+    const path = e.target.value;
+    
+    // 1. Remove current model if it exists
+    if (model) {
+        scene.remove(model);
+    }
+
+    // 2. Load new model
+    loader.load(path, (glb) => {
+        model = glb.scene;
+        model.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        scene.add(model);
+    });
+});
+
+const soundSelect = document.getElementById('sound-select');
+
+soundSelect.addEventListener('change', (e) => {
+    const path = e.target.value;
+    
+    // Load new buffer into the existing sound object
+    audioLoader.load(path, (buffer) => {
+        sound.setBuffer(buffer);
+    });
+});
+
+
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener("click", (event) => {
+
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    if (!model) return;
+
+    const intersects = raycaster.intersectObject(model, true);
+
+    if (intersects.length > 0) {
+        startSquash();
+        if (sound.isPlaying) sound.stop();
+        sound.play();
+    }
+
+});
+
+let lastTime = 0;
+
+let squashTime = 0;
+let isSquashing = false;
+const squashDuration = 0.3;
+
+
+function easeOutBack(x) {
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+
+    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+}
+
+function startSquash(){
+    squashTime = 0;
+    isSquashing = true;
+}
+
+
 function animate( time ) {
 
-	// cube.rotation.x += 0.01;
-	// cube.rotation.y += 0.01;
+	const delta = (time - lastTime) / 1000;
+    lastTime = time;
 
-	renderer.render( scene, camera );
+    if (isSquashing && model) {
+
+        squashTime += delta;
+        let t = squashTime / squashDuration;
+
+        if (t >= 1) {
+            t = 1;
+            isSquashing = false;
+        }
+
+        const e = easeOutBack(t);
+
+        const squash = Math.sin(e * Math.PI) * 0.35;
+
+        const scaleX = 1 + squash;
+        const scaleY = 1 - squash;
+        const scaleZ = 1 + squash;
+
+        model.scale.set(scaleX, scaleY, scaleZ);
+    }
+
+    renderer.render(scene, camera);
 
 }
 
 renderer.setAnimationLoop(animate);
+
