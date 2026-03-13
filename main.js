@@ -76,7 +76,75 @@ audioLoader.load( 'sounds/pop1.mp3', function( buffer ) {
 	sound.setVolume( 0.5 );
 	
 });
+function triggerFireworkBurst() {
+    if (!model) return;
 
+    const particleCount = 3; // Number of small Capoos to launch
+    const gravity = -0.01;   // How fast they fall
+
+    for (let i = 0; i < particleCount; i++) {
+        // 1. Clone the model
+        const particle = model.clone();
+        
+        // 2. Set initial look and position
+        particle.scale.set(0.2, 0.2, 0.2); // Make them small
+        particle.position.copy(model.position);
+        particle.position.y += 0.5; // Start from center of model
+        
+        scene.add(particle);
+
+        // 3. Create random velocity
+        // Outward force (X and Z) and upward force (Y)
+        const velocity = {
+            x: (Math.random() - 0.5) * 0.2,
+            y: Math.random() * 0.2 + 0.1,
+            z: (Math.random() - 0.5) * 0.2
+        };
+
+        // 4. Animation logic
+        let life = 1.0; // Opacity/Life tracker
+
+        function animateParticle() {
+            // Apply velocity to position
+            particle.position.x += velocity.x;
+            particle.position.y += velocity.y;
+            particle.position.z += velocity.z;
+
+            // Apply gravity to Y velocity
+            velocity.y += gravity;
+
+            // Rotate them randomly for a "tumbling" effect
+            particle.rotation.x += 0.1;
+            particle.rotation.y += 0.1;
+
+            // Fade out
+            life -= 0.02;
+            
+            // Traverse to change opacity of all meshes in the clone
+            particle.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone(); // Clone material to avoid fading original
+                    child.material.transparent = true;
+                    child.material.opacity = life;
+                }
+            });
+
+            if (life > 0) {
+                requestAnimationFrame(animateParticle);
+            } else {
+                scene.remove(particle);
+                // Clean up geometries and materials
+                particle.traverse((child) => {
+                    if (child.isMesh) {
+                        child.geometry.dispose();
+                        child.material.dispose();
+                    }
+                });
+            }
+        }
+        animateParticle();
+    }
+}
 
 const controls = new OrbitControls( camera, canvas );
 
@@ -238,6 +306,7 @@ window.addEventListener("click", (event) => {
         else
         {
             startSquash();
+            triggerFireworkBurst();
         }
 
         if (sound.isPlaying) sound.stop();
