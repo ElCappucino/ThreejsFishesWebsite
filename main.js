@@ -21,24 +21,29 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 const loader = new GLTFLoader();
 
+
 let model = null;
+let mixer = null;
 
 loader.load( 
-    "./capoo.glb", 
+    "./models/capoo.glb", 
     function ( glb ) {
 
+        
         model = glb.scene;
+        model.animations = glb.animations;
+        
+        scene.add( model );
+        model.rotation.y = -Math.PI / 4;
+        model.traverse((child)=>{
+            if (child.isMesh)
+            {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
 
-    model.traverse((child)=>{
-        if (child.isMesh)
-        {
-            child.castShadow = true;
-            child.receiveShadow = true;
-        }
-    });
-  scene.add( model );
-
-}, undefined, function ( error ) {
+    }, undefined, function ( error ) {
 
   console.error( error );
 
@@ -50,15 +55,8 @@ sun.shadow.normalBias = 0.1;
 sun.position.set(0, 20, 0);
 scene.add( sun );
 
-// const shadowHelper = new THREE.CameraHelper( sun.shadow.camera );
-// scene.add( shadowHelper );
-// const helper = new THREE.DirectionalLightHelper( sun, 5 );
-// scene.add( helper );
-
 const light = new THREE.AmbientLight( 0x404040, 3); // soft white light
 scene.add( light );
-
-
 
 const camera = new THREE.PerspectiveCamera
 ( 
@@ -79,14 +77,10 @@ audioLoader.load( 'sounds/pop1.mp3', function( buffer ) {
 	
 });
 
+
 const controls = new OrbitControls( camera, canvas );
 
 controls.update();
-
-// const geometry = new THREE.BoxGeometry( 1, 1, 1 );
-// const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-// const cube = new THREE.Mesh( geometry, material );
-// scene.add( cube );
 
 camera.position.z = 5;
 
@@ -104,59 +98,25 @@ function handleResize()
 
 window.addEventListener("resize", handleResize);
 
-// const modelSelect = document.getElementById('model-select');
-
-// modelSelect.addEventListener('change', (e) => {
-//     const path = e.target.value;
-    
-//     // 1. Remove current model if it exists
-//     if (model) {
-//         scene.remove(model);
-//     }
-
-//     // 2. Load new model
-//     loader.load(path, (glb) => {
-//         model = glb.scene;
-//         model.traverse((child) => {
-//             if (child.isMesh) {
-//                 child.castShadow = true;
-//                 child.receiveShadow = true;
-//             }
-//         });
-//         scene.add(model);
-//     });
-// });
-
-// const soundSelect = document.getElementById('sound-select');
-
-// soundSelect.addEventListener('change', (e) => {
-//     const path = e.target.value;
-    
-//     // Load new buffer into the existing sound object
-//     audioLoader.load(path, (buffer) => {
-//         sound.setBuffer(buffer);
-//     });
-// });
-
-const soundTrigger = document.getElementById('sound-trigger');
+//const soundTrigger = document.getElementById('sound-trigger');
 const modelTrigger = document.getElementById('model-trigger');
-const soundMenuPanel = document.getElementById('sound-menu-panel');
+//const soundMenuPanel = document.getElementById('sound-menu-panel');
 const modelMenuPanel = document.getElementById('model-menu-panel');
 
 // soundTrigger
 // Toggle the menu
-soundTrigger.addEventListener('click', (e) => {
-    e.stopPropagation(); // Prevents clicking through to the 3D model
-    soundMenuPanel.classList.toggle('hidden');
-    modelMenuPanel.classList.add('hidden');
-});
+// soundTrigger.addEventListener('click', (e) => {
+//     e.stopPropagation(); // Prevents clicking through to the 3D model
+//     soundMenuPanel.classList.toggle('hidden');
+//     modelMenuPanel.classList.add('hidden');
+// });
 
-// Close menu if clicking outside on the canvas
-window.addEventListener('click', (e) => {
-    if (!soundMenuPanel.contains(e.target) && e.target !== soundTrigger) {
-        soundMenuPanel.classList.add('hidden');
-    }
-});
+// // Close menu if clicking outside on the canvas
+// window.addEventListener('click', (e) => {
+//     if (!soundMenuPanel.contains(e.target) && e.target !== soundTrigger) {
+//         soundMenuPanel.classList.add('hidden');
+//     }
+// });
 
 // Sound Selection Logic
 document.querySelectorAll('.sound-item').forEach(item => {
@@ -177,9 +137,9 @@ document.querySelectorAll('.sound-item').forEach(item => {
 // Model Trigger
 // Toggle the menu
 modelTrigger.addEventListener('click', (e) => {
-    e.stopPropagation(); // Prevents clicking through to the 3D model
+    e.stopPropagation(); 
     modelMenuPanel.classList.toggle('hidden');
-    soundMenuPanel.classList.add('hidden');
+    //soundMenuPanel.classList.add('hidden');
 });
 
 // Close menu if clicking outside on the canvas
@@ -192,21 +152,48 @@ window.addEventListener('click', (e) => {
 document.querySelectorAll('.model-item').forEach(item => {
     item.addEventListener('click', () => {
         const path = item.getAttribute('data-model');
+        const soundPath = item.getAttribute('data-sound');
         
-        // 1. Remove current model if it exists
+        // Load the new buffer
+        audioLoader.load(soundPath, (buffer) => {
+            sound.setBuffer(buffer);
+            
+            // Visual feedback: remove active from others, add to this
+            document.querySelectorAll('.sound-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+        });
         if (model) {
             scene.remove(model);
         }
-
-        // 2. Load new model (MOVE THIS OUTSIDE THE IF BLOCK)
+        
         loader.load(path, (glb) => {
+            
+            
             model = glb.scene;
+            model.animations = glb.animations;
+            model.rotation.y = -Math.PI / 4;
+
+            console.log("Animations found:", glb.animations);
+    
+            if (glb.animations.length > 0) {
+                glb.animations.forEach((clip, index) => {
+                    console.log(`Animation ${index}: ${clip.name}`);
+                });
+            } else {
+                console.warn("This model has NO animations!");
+            }
+
             model.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
                 }
             });
+
+             if (glb.animations && glb.animations.length) {
+                mixer = new THREE.AnimationMixer(model);
+            }
+
             scene.add(model);
             document.querySelectorAll('.model-item').forEach(i => i.classList.remove('active'));
             item.classList.add('active');
@@ -220,6 +207,11 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 window.addEventListener("click", (event) => {
+    if (event.target.closest('#side-nav') || 
+        event.target.closest('#sound-menu-panel') || 
+        event.target.closest('#model-menu-panel')) {
+        return;
+    }
 
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -231,11 +223,26 @@ window.addEventListener("click", (event) => {
     const intersects = raycaster.intersectObject(model, true);
 
     if (intersects.length > 0) {
-        startSquash();
+
+        
+        console.log("model.animations.length:", model.animations.length);
+
+        if (mixer && model.animations && model.animations.length > 0) {
+            const action = mixer.clipAction(model.animations[0]);
+            
+            action.stop(); 
+            action.setLoop(THREE.LoopOnce); 
+            action.clampWhenFinished = true; 
+            action.play();
+        }
+        else
+        {
+            startSquash();
+        }
+
         if (sound.isPlaying) sound.stop();
         sound.play();
     }
-
 });
 
 let lastTime = 0;
@@ -257,11 +264,14 @@ function startSquash(){
     isSquashing = true;
 }
 
-
 function animate( time ) {
-
+    
 	const delta = (time - lastTime) / 1000;
     lastTime = time;
+
+    if (mixer) {
+        mixer.update(delta);
+    }
 
     if (isSquashing && model) {
 
