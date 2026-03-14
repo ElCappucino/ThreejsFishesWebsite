@@ -73,7 +73,7 @@ const sound = new THREE.Audio( listener );
 const audioLoader = new THREE.AudioLoader();
 audioLoader.load( 'sounds/pop1.mp3', function( buffer ) {
 	sound.setBuffer( buffer );
-	sound.setVolume( 0.5 );
+	sound.setVolume( 1.0 );
 	
 });
 function triggerFireworkBurst() {
@@ -292,6 +292,32 @@ window.addEventListener("click", (event) => {
 
     if (intersects.length > 0) {
 
+        
+        console.log("model.animations.length:", model.animations.length);
+
+        if (mixer && model.animations && model.animations.length > 0) {
+            const action = mixer.clipAction(model.animations[0]);
+            
+            action.stop(); 
+            action.setLoop(THREE.LoopOnce); 
+            action.clampWhenFinished = true; 
+            action.play();
+        }
+        else
+        {
+            startSquash();
+            triggerFireworkBurst();
+        }
+
+        if (sound.isPlaying) sound.stop();
+        sound.play();
+    }
+});
+
+window.addEventListener('keydown', function (e) {
+    if (e.code === 'Space') {
+        // Prevent default spacebar action (scrolling down)
+        e.preventDefault();
         
         console.log("model.animations.length:", model.animations.length);
 
