@@ -3,7 +3,6 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/exampl
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
 const scene = new THREE.Scene();
-scene.background = null;
 
 const canvas = document.getElementById("experience-canvas");
 const sizes = {
@@ -19,11 +18,13 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
-const loader = new GLTFLoader();
 
+const loader = new GLTFLoader();
 
 let model = null;
 let mixer = null;
+
+let currentAnimationIndex = 0;
 
 loader.load( 
     "./models/capoo.glb", 
@@ -68,14 +69,35 @@ const camera = new THREE.PerspectiveCamera
 
 const listener = new THREE.AudioListener();
 camera.add( listener );
-const sound = new THREE.Audio( listener );
 
+const sound = new THREE.Audio( listener );
 const audioLoader = new THREE.AudioLoader();
 audioLoader.load( 'sounds/pop1.mp3', function( buffer ) {
 	sound.setBuffer( buffer );
 	sound.setVolume( 1.0 );
 	
 });
+
+const controls = new OrbitControls( camera, canvas );
+controls.minPolarAngle = Math.PI / 2;
+controls.maxPolarAngle = Math.PI / 2;
+controls.update();
+camera.position.z = 5;
+
+
+
+let transitionState = "IDLE"; // IDLE, EXITING, ENTERING
+let pendingModelPath = null;
+let t_transition = 0;
+let currentRotation = 0;
+let targetRotationTransition = 0;
+const rotationThreshold = THREE.MathUtils.degToRad(360);
+const transitionSpeed = 0.01; // Speed of the slide
+const exitThreshold = -8;     // How far down the model goes before disappearing
+const targetY = 0;            // The original resting Y position
+
+// function ----------------------------------------------------------------------
+
 function triggerFireworkBurst() {
     if (!model) return;
 
@@ -83,26 +105,23 @@ function triggerFireworkBurst() {
     const gravity = -0.01;   // How fast they fall
 
     for (let i = 0; i < particleCount; i++) {
-        // 1. Clone the model
+
         const particle = model.clone();
         
-        // 2. Set initial look and position
-        particle.scale.set(0.2, 0.2, 0.2); // Make them small
+        particle.scale.set(0.2, 0.2, 0.2);
         particle.position.copy(model.position);
-        particle.position.y += 0.5; // Start from center of model
+        particle.position.y += 0.5;
         
         scene.add(particle);
 
-        // 3. Create random velocity
-        // Outward force (X and Z) and upward force (Y)
         const velocity = {
             x: (Math.random() - 0.5) * 0.2,
             y: Math.random() * 0.2 + 0.1,
             z: (Math.random() - 0.5) * 0.2
         };
 
-        // 4. Animation logic
-        let life = 1.0; // Opacity/Life tracker
+        // Opacity/Life tracker
+        let life = 1.0;
 
         function animateParticle() {
             // Apply velocity to position
@@ -146,11 +165,7 @@ function triggerFireworkBurst() {
     }
 }
 
-const controls = new OrbitControls( camera, canvas );
 
-controls.update();
-
-camera.position.z = 5;
 
 function handleResize()
 {
@@ -231,45 +246,78 @@ document.querySelectorAll('.model-item').forEach(item => {
             item.classList.add('active');
         });
         if (model) {
-            scene.remove(model);
+            pendingModelPath = path; // Store the next model to load
+            transitionState = "EXITING"; // Let the animate loop slide it down
+            t_transition = 0;
+            currentRotation = model.rotation.y;
+            targetRotationTransition = currentRotation + rotationThreshold;
+        } else {
+            loadNewModel(path);
         }
         
-        loader.load(path, (glb) => {
-            
-            
-            model = glb.scene;
-            model.animations = glb.animations;
-            model.rotation.y = -Math.PI / 4;
-
-            console.log("Animations found:", glb.animations);
-    
-            if (glb.animations.length > 0) {
-                glb.animations.forEach((clip, index) => {
-                    console.log(`Animation ${index}: ${clip.name}`);
-                });
-            } else {
-                console.warn("This model has NO animations!");
-            }
-
-            model.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-            });
-
-             if (glb.animations && glb.animations.length) {
-                mixer = new THREE.AnimationMixer(model);
-            }
-
-            scene.add(model);
-            document.querySelectorAll('.model-item').forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-        }, undefined, (error) => console.error(error));
     });
 });
 
+function loadNewModel(path) {
+    loader.load(path, (glb) => {
+            
+        model = glb.scene;
+        model.animations = glb.animations;
+        model.rotation.y = -Math.PI / 4;
+        model.position.y = exitThreshold;
+        console.log("Animations found:", glb.animations);
 
+        if (glb.animations.length > 0) {
+            glb.animations.forEach((clip, index) => {
+                console.log(`Animation ${index}: ${clip.name}`);
+            });
+        } else {
+            console.warn("This model has NO animations!");
+        }
+        model.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+         if (glb.animations && glb.animations.length) {
+            mixer = new THREE.AnimationMixer(model);
+        }
+        scene.add(model);
+        transitionState = "ENTERING";
+        t_transition = 0;
+        currentRotation = model.rotation.y;
+        targetRotationTransition = currentRotation + rotationThreshold;
+        document.querySelectorAll('.model-item').forEach(i => i.classList.remove('active'));
+
+    }, undefined, (error) => console.error(error));
+}
+function playNextAnimation() {
+    if (!model || !mixer || !model.animations || model.animations.length == 0) {
+        startSquash();
+        triggerFireworkBurst();
+
+        if (sound.isPlaying) sound.stop();
+        sound.play();
+        return;
+    }
+
+    mixer.stopAllAction();
+
+    // Increment and wrap around
+    currentAnimationIndex = (currentAnimationIndex + 1) % model.animations.length;
+    console.log("Playing animation index:", currentAnimationIndex);
+
+    const action = mixer.clipAction(model.animations[currentAnimationIndex]);
+    
+    action.stop(); 
+    action.setLoop(THREE.LoopOnce); 
+    action.clampWhenFinished = true; 
+    action.play();
+
+    if (sound.isPlaying) sound.stop();
+    sound.play();
+}
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -293,24 +341,7 @@ window.addEventListener("click", (event) => {
     if (intersects.length > 0) {
 
         
-        console.log("model.animations.length:", model.animations.length);
-
-        if (mixer && model.animations && model.animations.length > 0) {
-            const action = mixer.clipAction(model.animations[0]);
-            
-            action.stop(); 
-            action.setLoop(THREE.LoopOnce); 
-            action.clampWhenFinished = true; 
-            action.play();
-        }
-        else
-        {
-            startSquash();
-            triggerFireworkBurst();
-        }
-
-        if (sound.isPlaying) sound.stop();
-        sound.play();
+        playNextAnimation();
     }
 });
 
@@ -319,24 +350,7 @@ window.addEventListener('keydown', function (e) {
         // Prevent default spacebar action (scrolling down)
         e.preventDefault();
         
-        console.log("model.animations.length:", model.animations.length);
-
-        if (mixer && model.animations && model.animations.length > 0) {
-            const action = mixer.clipAction(model.animations[0]);
-            
-            action.stop(); 
-            action.setLoop(THREE.LoopOnce); 
-            action.clampWhenFinished = true; 
-            action.play();
-        }
-        else
-        {
-            startSquash();
-            triggerFireworkBurst();
-        }
-
-        if (sound.isPlaying) sound.stop();
-        sound.play();
+        playNextAnimation();
     }
 });
 
@@ -354,10 +368,15 @@ function easeOutBack(x) {
     return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
 }
 
+function easeOutSine(x)  {
+  return Math.sin((x * Math.PI) / 2);
+}
+
 function startSquash(){
     squashTime = 0;
     isSquashing = true;
 }
+
 
 function animate( time ) {
     
@@ -368,25 +387,53 @@ function animate( time ) {
         mixer.update(delta);
     }
 
-    if (isSquashing && model) {
+    if (model) {
 
-        squashTime += delta;
-        let t = squashTime / squashDuration;
+        if (transitionState === "EXITING") {
+            t_transition = Math.min(t_transition + transitionSpeed, 1);
+            const eased = easeOutSine(t_transition);
 
-        if (t >= 1) {
-            t = 1;
-            isSquashing = false;
+            model.position.y = targetY + (exitThreshold - targetY) * eased;
+            model.rotation.y = currentRotation + (targetRotationTransition - currentRotation) * eased;
+            if (model.position.y <= exitThreshold) {
+                // Once fully out of scene, remove and load new one
+                scene.remove(model);
+                loadNewModel(pendingModelPath);
+                transitionState = "LOADING"; 
+            }
+        } else if (transitionState === "ENTERING") {
+            t_transition = Math.min(t_transition + transitionSpeed, 1);
+            const eased = easeOutSine(t_transition);
+
+            model.position.y = exitThreshold + (targetY - exitThreshold) * eased;
+            model.rotation.y = currentRotation + (targetRotationTransition - currentRotation) * eased;
+            if (model.position.y >= targetY) {
+                model.position.y = targetY; // Snap to center
+                transitionState = "IDLE";
+            }
         }
 
-        const e = easeOutBack(t);
+        if (isSquashing)
+        {
+            squashTime += delta;
+            let t = squashTime / squashDuration;
 
-        const squash = Math.sin(e * Math.PI) * 0.35;
+            if (t >= 1) {
+                t = 1;
+                isSquashing = false;
+            }
 
-        const scaleX = 1 + squash;
-        const scaleY = 1 - squash;
-        const scaleZ = 1 + squash;
+            const e = easeOutBack(t);
 
-        model.scale.set(scaleX, scaleY, scaleZ);
+            const squash = Math.sin(e * Math.PI) * 0.35;
+
+            const scaleX = 1 + squash;
+            const scaleY = 1 - squash;
+            const scaleZ = 1 + squash;
+
+            model.scale.set(scaleX, scaleY, scaleZ);
+        }
+        
     }
 
     renderer.render(scene, camera);
